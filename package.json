@@ -1,0 +1,30 @@
+{
+  "name": "pgn-manager",
+  "version": "1.0.0",
+  "description": "Libraray built on top of chess.js and pgn-parser to load and process PGN files in typescript.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hadron43/pgn-manager.git"
+  },
+  "keywords": [
+    "Chess",
+    "PGN",
+    "Portal",
+    "Game",
+    "Notation"
+  ],
+  "author": "Harsh Kumar",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hadron43/pgn-manager/issues"
+  },
+  "homepage": "https://github.com/hadron43/pgn-manager#readme",
+  "dependencies": {
+    "chess.js": "0.12.0",
+    "pgn-parser": "2.1.0"
+  }
+}
