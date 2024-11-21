@@ -11,3 +11,8 @@ pgn-parser@2.1.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/pgn-parser/-/pgn-parser-2.1.0.tgz#dabae620f55b6fb803829a11496f7756c5c09d2d"
   integrity sha512-mcY6T1lHKVBF05w4WOOLKQm3vM25gQHreC/VVmhGsInvPBZEKlICcgTkqZGWtzWTa1I6J0JSgO82Q6dLi305og==
+
+typescript@4.5.2:
+  version "4.5.2"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.5.2.tgz#8ac1fba9f52256fdb06fb89e4122fa6a346c2998"
+  integrity sha512-5BlMof9H1yGt0P8/WF+wPNw6GfctgGjXp5hkblpyT+8rkASSmkUKMXrxR0Xg8ThVCi/JnHQiKXeBaEwCeQwMFw==
