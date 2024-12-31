@@ -216,6 +216,21 @@ class PGNManager {
 
     return this.chessjsInstance.get(move);
   };
+
+  /**
+   * Gets the color of the player who made the move
+   * @param moveOrId - The move object or move ID number
+   * @returns "w" for white or "b" for black
+   * @throws Error if the move parameter is invalid
+   */
+  public getMoveColor = (moveOrId: Move | number): "w" | "b" => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
+    if (!move) {
+      throw Error("Invalid 'move' parameter while getting move color");
+    }
+    return this.getChessJSInstance(move).turn() === "w" ? "b" : "w";
+  };
 }
 
 export default PGNManager;
