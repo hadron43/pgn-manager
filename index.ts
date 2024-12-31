@@ -7,13 +7,31 @@ export const FEN_START_POSITION =
 export const FEN_EMPTY_POSITION = "8/8/8/8/8/8/8/8";
 
 class PGNManager {
+  /** The raw PGN string input */
   private rawPGN: string;
+
+  /** The parsed PGN game object */
   private game: ParsedPGN;
+
+  /** Array of moves in traversal order */
   private sortedMoves: Array<Move>;
+
+  /** Map of moves to their FEN position strings */
   private moveFen: Map<Move, string>;
+
+  /** Map of moves to their parent variations (or null for mainline) */
   private moveParent: Map<Move, Rav | null>;
+
+  /** Map of variations to their parent moves */
   private ravParent: Map<Rav, Move>;
 
+  /** Map of moves to the color of the player who made the move */
+  private moveColor: Map<Move, "w" | "b">;
+
+  /**
+   * Creates a new PGNManager instance
+   * @param pgn - The PGN string to parse and manage
+   */
   constructor(pgn: string) {
     this.rawPGN = pgn;
     this.game = pgnParser.parse(pgn + " *")[0];
@@ -22,10 +40,15 @@ class PGNManager {
     this.moveParent = new Map();
     this.ravParent = new Map();
     this.moveFen = new Map();
+    this.moveColor = new Map();
 
     this.dfOnGame(this.game);
   }
 
+  /**
+   * Initializes the game traversal starting from the initial position
+   * @param game - The parsed PGN game object
+   */
   private dfOnGame = (game: ParsedPGN) => {
     this.sortedMoves = [];
 
@@ -36,6 +59,12 @@ class PGNManager {
     }
   };
 
+  /**
+   * Performs depth-first traversal of the game moves and variations
+   * @param move - The current move being processed
+   * @param parent - The parent RAV (variation) containing the move
+   * @param chessGame - The chess instance for the current position
+   */
   private dfsOnGame = (
     move: Move,
     parent: Rav,
@@ -62,31 +91,67 @@ class PGNManager {
     )
       console.log("Invalid move: " + move.move);
     this.moveFen.set(move, chessGame.fen());
+    this.moveColor.set(move, chessGame.turn() === "w" ? "b" : "w");
   };
 
+  /**
+   * Gets the raw PGN string
+   * @returns The original PGN string
+   */
   public get pgn(): string {
     return this.rawPGN;
   }
 
+  /**
+   * Gets the parsed PGN object
+   * @returns The parsed PGN game object
+   */
   public get parsedPGN(): ParsedPGN {
     return this.game;
   }
 
+  /**
+   * Gets the game headers
+   * @returns Array of game headers
+   */
   public get headers(): Array<Header> {
     if (!this.game || !this.game.headers) return [];
     return this.game.headers;
   }
 
+  /**
+   * Gets a move by its number in the sequence
+   * @param moveNumber - The 1-based index of the move
+   * @returns The move object at the specified position
+   */
   public getMove = (moveNumber: number) => {
     let move = this.sortedMoves[moveNumber - 1];
     return move;
   };
 
+  /**
+   * Gets the number of a move in the sequence
+   * @param move - The move object
+   * @returns The 1-based index of the move
+   */
   public getMoveNumber = (move: Move) => {
     return this.sortedMoves.indexOf(move) + 1;
   };
 
-  public nextMove = (move: Move | undefined): Move => {
+  /**
+   * Gets the next move in the sequence
+   * @param moveOrId - The current move object or move number
+   * @returns The next move in the sequence
+   * @throws Error if there are no moves in the game
+   */
+  public nextMove = (moveOrId: Move | number | undefined): Move => {
+    let move: Move | undefined;
+    if (typeof moveOrId === "number") {
+      move = this.getMove(moveOrId);
+    } else {
+      move = moveOrId;
+    }
+
     if (!move) {
       if (this.sortedMoves.length == 0) {
         throw Error("No moves in game");
@@ -119,11 +184,27 @@ class PGNManager {
     return tempNextMove;
   };
 
-  public hasNextMove = (move: Move): boolean => {
+  /**
+   * Checks if there is a next move available
+   * @param moveOrId - The current move object or move number
+   * @returns True if there is a next move, false otherwise
+   */
+  public hasNextMove = (moveOrId: Move | number): boolean => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
     return !move || this.nextMove(move) !== move;
   };
 
-  public previousMove = (move: Move): Move | undefined => {
+  /**
+   * Gets the previous move in the sequence
+   * @param moveOrId - The current move object or move number
+   * @returns The previous move or undefined if at the start
+   * @throws Error if there are no moves or if the move parameter is invalid
+   */
+  public previousMove = (moveOrId: Move | number): Move | undefined => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
+
     if (!move) {
       if (this.sortedMoves.length == 0) {
         throw Error("No moves in game");
@@ -153,6 +234,11 @@ class PGNManager {
     return tempPrevMove;
   };
 
+  /**
+   * Gets the first move in the game
+   * @returns The first move
+   * @throws Error if there are no moves in the game
+   */
   public getFirstMove = () => {
     if (this.sortedMoves.length == 0) {
       throw Error("No moves in game");
@@ -160,6 +246,11 @@ class PGNManager {
     return this.sortedMoves[0];
   };
 
+  /**
+   * Gets the last move in the game
+   * @returns The last move
+   * @throws Error if there are no moves in the game
+   */
   public getLastMove = () => {
     if (this.sortedMoves.length == 0) {
       throw Error("No moves in game");
@@ -167,7 +258,15 @@ class PGNManager {
     return this.game.moves[this.game.moves.length - 1];
   };
 
-  public getMoveFen = (move: Move): string => {
+  /**
+   * Gets the FEN string for a specific move
+   * @param moveOrId - The move object or move number
+   * @returns The FEN string representing the position after the move
+   * @throws Error if the move parameter is invalid
+   */
+  public getMoveFen = (moveOrId: Move | number): string => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
     if (!move) {
       throw Error("Invalid 'move' parameter while getting fen");
     }
@@ -175,12 +274,35 @@ class PGNManager {
     return moveFen ? moveFen : FEN_EMPTY_POSITION;
   };
 
-  public getParentRav = (move: Move): Rav | null => {
+  /**
+   * Gets the parent RAV (variation) for a move
+   * @param moveOrId - The move object or move number
+   * @returns The parent RAV or null if the move is in the main line
+   * @throws Error if the move parameter is invalid
+   */
+  public getParentRav = (moveOrId: Move | number): Rav | null => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
     if (!move) {
       throw Error("Invalid 'move' parameter while getting parent rav");
     }
     let parentRav = this.moveParent.get(move);
     return parentRav ? parentRav : null;
+  };
+
+  /**
+   * Gets the color of the player who made the move
+   * @param moveOrId - The move object or move ID number
+   * @returns "w" for white or "b" for black
+   * @throws Error if the move parameter is invalid
+   */
+  public getMoveColor = (moveOrId: Move | number): "w" | "b" => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
+    if (!move) {
+      throw Error("Invalid 'move' parameter while getting move color");
+    }
+    return this.moveColor.get(move);
   };
 }
 
