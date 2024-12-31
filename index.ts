@@ -25,8 +25,8 @@ class PGNManager {
   /** Map of variations to their parent moves */
   private ravParent: Map<Rav, Move>;
 
-  /** Map of moves to their corresponding chess.js instances */
-  private chessjsInstance: Map<Move, ChessJS.ChessInstance>;
+  /** Map of moves to the color of the player who made the move */
+  private moveColor: Map<Move, "w" | "b">;
 
   /**
    * Creates a new PGNManager instance
@@ -90,6 +90,7 @@ class PGNManager {
     )
       console.log("Invalid move: " + move.move);
     this.moveFen.set(move, chessGame.fen());
+    this.moveColor.set(move, chessGame.turn() === "w" ? "b" : "w");
   };
 
   /**
@@ -289,29 +290,6 @@ class PGNManager {
   };
 
   /**
-   * Gets a chess.js instance for a specific move
-   * @param moveOrId - The move object or move number
-   * @returns A chess.js instance representing the position after the move
-   * @throws Error if the move parameter is invalid
-   */
-  public getChessJSInstance = (
-    moveOrId: Move | number
-  ): ChessJS.ChessInstance => {
-    const move =
-      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
-    if (!move) {
-      throw Error("Invalid 'move' parameter while getting chessjs instance");
-    }
-
-    // if chessjs instance is unavailaable, create a new instance
-    if (!this.chessjsInstance.get(move)) {
-      this.chessjsInstance.set(move, new Chess(this.getMoveFen(move)));
-    }
-
-    return this.chessjsInstance.get(move);
-  };
-
-  /**
    * Gets the color of the player who made the move
    * @param moveOrId - The move object or move ID number
    * @returns "w" for white or "b" for black
@@ -323,7 +301,7 @@ class PGNManager {
     if (!move) {
       throw Error("Invalid 'move' parameter while getting move color");
     }
-    return this.getChessJSInstance(move).turn() === "w" ? "b" : "w";
+    return this.getMoveColor(move);
   };
 }
 
