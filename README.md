@@ -58,14 +58,14 @@ const headers = manager.headers;
 
 ### Methods
 - `getMove(moveNumber: number)`: Get move by number
-- `getMoveNumber(move: Move)`: Get number for a move
-- `nextMove(move: Move)`: Get next move in the sequence
-- `previousMove(move: Move)`: Get previous move
-- `hasNextMove(move: Move)`: Check if move has a next move
+- `getMoveNumber(moveOrMoveId: Move | number)`: Get number for a move
+- `nextMove(moveOrMoveId: Move | number)`: Get next move in the sequence
+- `previousMove(moveOrMoveId: Move | number)`: Get previous move
+- `hasNextMove(moveOrMoveId: Move | number)`: Check if move has a next move
 - `getFirstMove()`: Get the first move of the game
 - `getLastMove()`: Get the last move of the game
-- `getMoveFen(move: Move)`: Get FEN position after move
-- `getParentRav(move: Move)`: Get parent variation for move
+- `getMoveFen(moveOrMoveId: Move | number)`: Get FEN position after move
+- `getParentRav(moveOrMoveId: Move | number)`: Get parent variation for move
 
 ## Examples 🎯
 

@@ -86,7 +86,14 @@ class PGNManager {
     return this.sortedMoves.indexOf(move) + 1;
   };
 
-  public nextMove = (move: Move | undefined): Move => {
+  public nextMove = (moveOrId: Move | number | undefined): Move => {
+    let move: Move | undefined;
+    if (typeof moveOrId === "number") {
+      move = this.getMove(moveOrId);
+    } else {
+      move = moveOrId;
+    }
+
     if (!move) {
       if (this.sortedMoves.length == 0) {
         throw Error("No moves in game");
@@ -119,11 +126,16 @@ class PGNManager {
     return tempNextMove;
   };
 
-  public hasNextMove = (move: Move): boolean => {
+  public hasNextMove = (moveOrId: Move | number): boolean => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
     return !move || this.nextMove(move) !== move;
   };
 
-  public previousMove = (move: Move): Move | undefined => {
+  public previousMove = (moveOrId: Move | number): Move | undefined => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
+
     if (!move) {
       if (this.sortedMoves.length == 0) {
         throw Error("No moves in game");
@@ -167,7 +179,9 @@ class PGNManager {
     return this.game.moves[this.game.moves.length - 1];
   };
 
-  public getMoveFen = (move: Move): string => {
+  public getMoveFen = (moveOrId: Move | number): string => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
     if (!move) {
       throw Error("Invalid 'move' parameter while getting fen");
     }
@@ -175,7 +189,9 @@ class PGNManager {
     return moveFen ? moveFen : FEN_EMPTY_POSITION;
   };
 
-  public getParentRav = (move: Move): Rav | null => {
+  public getParentRav = (moveOrId: Move | number): Rav | null => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
     if (!move) {
       throw Error("Invalid 'move' parameter while getting parent rav");
     }
