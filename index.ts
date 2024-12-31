@@ -40,6 +40,7 @@ class PGNManager {
     this.moveParent = new Map();
     this.ravParent = new Map();
     this.moveFen = new Map();
+    this.moveColor = new Map();
 
     this.dfOnGame(this.game);
   }
@@ -301,7 +302,7 @@ class PGNManager {
     if (!move) {
       throw Error("Invalid 'move' parameter while getting move color");
     }
-    return this.getMoveColor(move);
+    return this.moveColor.get(move);
   };
 }
 
