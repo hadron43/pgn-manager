@@ -65,7 +65,6 @@ const headers = manager.headers;
 - `getLastMove()`: Get the last move of the game
 - `getMoveFen(moveOrMoveId: Move | number)`: Get FEN position after move
 - `getParentRav(moveOrMoveId: Move | number)`: Get parent variation for move
-- `getChessJSInstance(moveOrMoveId: Move | number)`: Get or create a ChessJS instance for the position after the specified move
 - `getMoveColor(moveOrMoveId: Move | number)`: Gets the color of the player who made the move ("w" for white or "b" for black)
 
 ## Examples 🎯
