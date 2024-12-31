@@ -13,6 +13,7 @@ class PGNManager {
   private moveFen: Map<Move, string>;
   private moveParent: Map<Move, Rav | null>;
   private ravParent: Map<Rav, Move>;
+  private chessjsInstance: Map<Move, ChessJS.ChessInstance>;
 
   constructor(pgn: string) {
     this.rawPGN = pgn;
@@ -197,6 +198,23 @@ class PGNManager {
     }
     let parentRav = this.moveParent.get(move);
     return parentRav ? parentRav : null;
+  };
+
+  public getChessJSInstance = (
+    moveOrId: Move | number
+  ): ChessJS.ChessInstance => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
+    if (!move) {
+      throw Error("Invalid 'move' parameter while getting chessjs instance");
+    }
+
+    // if chessjs instance is unavailaable, create a new instance
+    if (!this.chessjsInstance.get(move)) {
+      this.chessjsInstance.set(move, new Chess(this.getMoveFen(move)));
+    }
+
+    return this.chessjsInstance.get(move);
   };
 }
 
