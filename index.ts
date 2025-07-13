@@ -1,6 +1,10 @@
 import * as ChessJS from "chess.js";
 const Chess = typeof ChessJS === "function" ? ChessJS : ChessJS.Chess;
-import pgnParser, { ParsedPGN, Move, Rav, Header } from "pgn-parser";
+import { ShortMove } from "chess.js";
+import * as pgnParser from "pgn-parser";
+import type { ParsedPGN, Move, Rav, Header, Result } from "pgn-parser";
+
+import { regeneratePGN } from "./utils";
 
 export const FEN_START_POSITION =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -303,6 +307,78 @@ class PGNManager {
       throw Error("Invalid 'move' parameter while getting move color");
     }
     return this.moveColor.get(move);
+  };
+
+  /***
+   * Pushes a new move into the game
+   * @param moveId - The ID of the move to push
+   * @param newMove - The move object to add
+   */
+  public pushMove = (
+    moveId: number,
+    newMove: ShortMove,
+    result: Result = "*"
+  ): Move => {
+    const currentMove = this.getMove(moveId);
+
+    // check if it's a valid move
+    const chess = new Chess(this.getMoveFen(currentMove));
+    if (!chess.move(newMove)) {
+      throw Error("Invalid move");
+    }
+
+    // check if this is a new variation
+    let isNewVariation = false;
+    const parentRav = this.getParentRav(currentMove);
+    if (parentRav.moves[parentRav.moves.length - 1] != currentMove) {
+      isNewVariation = true;
+    }
+
+    // add the move to the game
+    let move = undefined;
+    if (isNewVariation) {
+      move = {
+        move: chess.history().slice(-1)[0],
+        ravs: undefined,
+        move_number: currentMove.move_number,
+        comments: [],
+      };
+      const newVar: Rav = {
+        moves: [move],
+        result,
+      };
+      currentMove.ravs.push(newVar);
+
+      // update class variables
+      this.moveParent.set(move, newVar);
+      this.ravParent.set(newVar, currentMove);
+      this.moveFen.set(move, chess.fen());
+      this.moveColor.set(move, this.getMoveColor(currentMove));
+    } else {
+      move = {
+        move: chess.history().slice(-1)[0],
+        ravs: undefined,
+        move_number:
+          this.getMoveColor(currentMove) === "w"
+            ? undefined
+            : currentMove.move_number + 1,
+        comments: [],
+      };
+      parentRav.moves.push(move);
+
+      // update class variables
+      this.moveParent.set(move, parentRav);
+      this.moveFen.set(move, chess.fen());
+      this.moveColor.set(
+        move,
+        this.getMoveColor(currentMove) === "w" ? "b" : "w"
+      );
+    }
+
+    this.rawPGN = regeneratePGN(this.game);
+    this.dfOnGame(this.game);
+
+    return move;
   };
 }
 
