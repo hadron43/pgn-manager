@@ -1,10 +1,12 @@
-import * as pgnParser from "pgn-parser";
-import type { ParsedPGN, Move, Rav, Header, Result } from "pgn-parser";
+import type { ParsedPGN, Move } from "pgn-parser";
 
 /**
  * Regenerates a PGN string from a ParsedPGN object
  */
-export function regeneratePGN(parsedPGN: ParsedPGN): string {
+export function regeneratePGN(
+  parsedPGN: ParsedPGN,
+  moveColor: Map<Move, "w" | "b">
+): string {
   const lines: string[] = [];
 
   // Add comments above header
@@ -32,7 +34,7 @@ export function regeneratePGN(parsedPGN: ParsedPGN): string {
   }
 
   // Add moves
-  const movesText = formatMoves(parsedPGN.moves);
+  const movesText = formatMoves(parsedPGN.moves, moveColor);
   if (movesText) {
     lines.push(movesText);
   }
@@ -46,13 +48,16 @@ export function regeneratePGN(parsedPGN: ParsedPGN): string {
 /**
  * Formats moves array into PGN move notation
  */
-function formatMoves(moves: Move[]): string {
+function formatMoves(moves: Move[], moveColor: Map<Move, "w" | "b">): string {
   const parts: string[] = [];
 
   moves.forEach((move) => {
     // Add move number for white moves
     if (move.move_number !== undefined) {
       parts.push(`${move.move_number}.`);
+      if (moveColor.get(move) === "b") {
+        parts[parts.length - 1] += "..";
+      }
     }
 
     // Add the move
@@ -66,7 +71,7 @@ function formatMoves(moves: Move[]): string {
     // Add variations (RAVs)
     if (move.ravs) {
       move.ravs.forEach((rav) => {
-        const ravMoves = formatMoves(rav.moves);
+        const ravMoves = formatMoves(rav.moves, moveColor);
         const ravResult = rav.result ? ` ${rav.result}` : "";
         parts.push(`(${ravMoves}${ravResult})`);
       });

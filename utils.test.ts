@@ -18,7 +18,11 @@ describe("regeneratePGN", () => {
       result: "1-0",
     };
 
-    const result = regeneratePGN(parsedPGN);
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
+
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain('[Event "Test Game"]');
     expect(result).toContain('[Site "Test Site"]');
@@ -39,7 +43,9 @@ describe("regeneratePGN", () => {
       result: "*",
     };
 
-    const result = regeneratePGN(parsedPGN);
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("{This is a test game}");
     expect(result).toContain("{Another comment}");
@@ -55,7 +61,10 @@ describe("regeneratePGN", () => {
       result: "*",
     };
 
-    const result = regeneratePGN(parsedPGN);
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("{Game comment}");
     expect(result).toContain("1. e4");
@@ -82,8 +91,11 @@ describe("regeneratePGN", () => {
       ],
       result: "*",
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("{Good opening move}");
     expect(result).toContain("{Solid response}");
@@ -109,8 +121,12 @@ describe("regeneratePGN", () => {
       ],
       result: "*",
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
+    moveColor.set(parsedPGN.moves[2], "w");
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("(2. f4 exf4)");
     expect(result).toContain("2. Nf3");
@@ -136,8 +152,12 @@ describe("regeneratePGN", () => {
       ],
       result: "*",
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
+    moveColor.set(parsedPGN.moves[2], "w");
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("(2. f4 exf4 0-1)");
   });
@@ -150,8 +170,9 @@ describe("regeneratePGN", () => {
       moves: [],
       result: "*",
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain('[Event "Test Game"]');
     expect(result).toContain("*");
@@ -169,8 +190,11 @@ describe("regeneratePGN", () => {
       ],
       result: "*",
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("1. e4 e5");
     expect(result).toContain("*");
@@ -202,7 +226,12 @@ describe("regeneratePGN", () => {
       result: "*",
     };
 
-    const result = regeneratePGN(parsedPGN);
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
+    moveColor.set(parsedPGN.moves[2], "w");
+
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("(2. f4 (3. Bc4) exf4)");
     expect(result).toContain("2. Nf3");
@@ -221,8 +250,13 @@ describe("regeneratePGN", () => {
       ],
       result: "*",
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
+    moveColor.set(parsedPGN.moves[2], "w");
+    moveColor.set(parsedPGN.moves[3], "b");
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("1. e4 e5 2. Nf3 Nc6");
   });
@@ -242,8 +276,10 @@ describe("regeneratePGN", () => {
       comments_above_header: null,
       comments: null,
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("{Best by test}");
     expect(result).toContain("{Theory}");
@@ -276,8 +312,14 @@ describe("regeneratePGN", () => {
       comments_above_header: null,
       comments: null,
     };
+    const moveColor: Map<Move, "w" | "b"> = new Map();
+    moveColor.set(parsedPGN.moves[0], "w");
+    moveColor.set(parsedPGN.moves[1], "b");
+    moveColor.set(parsedPGN.moves[2], "w");
+    moveColor.set(variation1.moves[0], "w");
+    moveColor.set(variation2.moves[0], "w");
 
-    const result = regeneratePGN(parsedPGN);
+    const result = regeneratePGN(parsedPGN, moveColor);
 
     expect(result).toContain("(2. f4)");
     expect(result).toContain("(2. d4)");

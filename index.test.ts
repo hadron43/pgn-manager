@@ -1,4 +1,5 @@
 import PGNManager, { FEN_START_POSITION, FEN_EMPTY_POSITION } from "./index";
+import { Move } from "pgn-parser";
 
 describe("PGNManager", () => {
   const simplePGN = `[Event "Test Game"]
@@ -377,6 +378,100 @@ describe("PGNManager", () => {
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
       );
       expect(FEN_EMPTY_POSITION).toBe("8/8/8/8/8/8/8/8");
+    });
+  });
+
+  describe("Delete Move", () => {
+    it("should delete a move", () => {
+      const manager = new PGNManager(simplePGN);
+      const lastMove = manager.getLastMove();
+      const moveNumber = manager.getMoveNumber(lastMove);
+      manager.deleteMove(moveNumber);
+      expect(manager.parsedPGN.moves.length).toBe(9);
+    });
+
+    it("should throw error for invalid move", () => {
+      const manager = new PGNManager(simplePGN);
+      expect(() => manager.deleteMove(0)).toThrow("Invalid move");
+    });
+
+    it("should delete a move in a complex variation", () => {
+      const manager = new PGNManager(pgnWithVariations);
+      manager.deleteMove(5);
+      expect(manager.parsedPGN.moves.length).toBe(6);
+      const newPgn = `[Event "Test Game"]
+[Site "Test Site"]
+[Date "2023.01.01"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 (2. f4) 2... Nc6 3. Bb5 a6
+1-0`;
+      expect(manager.pgn).toBe(newPgn);
+    });
+
+    it("should properly update FEN after deleting a move", () => {
+      const manager = new PGNManager(simplePGN);
+      const prevMove = manager.previousMove(5);
+      if (!prevMove) throw new Error("Previous move not found");
+      const prevFen = manager.getMoveFen(prevMove);
+
+      manager.deleteMove(5);
+
+      const newLastMove = manager.getLastMove();
+      expect(manager.getMoveFen(newLastMove)).toBe(prevFen);
+    });
+
+    it("should handle deleting moves from the main line", () => {
+      const manager = new PGNManager(pgnWithVariations);
+      manager.deleteMove(2);
+      expect(manager.parsedPGN.moves.length).toBe(1);
+      expect(manager.getLastMove().move).toBe("e4");
+    });
+
+    it("should handle deleting moves that have variations", () => {
+      const manager = new PGNManager(pgnWithVariations);
+      manager.deleteMove(4); // Deleting move with variation
+      expect(manager.parsedPGN.moves.length).toBe(6);
+      const secondMove = manager.getMove(2);
+      expect(secondMove.ravs).toBeUndefined();
+    });
+
+    it("should cleanup all references after deleting moves", () => {
+      const manager = new PGNManager(pgnWithVariations);
+      const moveToDelete = manager.getMove(4);
+      manager.deleteMove(4);
+
+      expect(() => manager.getMoveFen(moveToDelete)).toThrow();
+      expect(() => manager.getMoveColor(moveToDelete)).toThrow();
+      expect(() => manager.getParentRav(moveToDelete)).toThrow();
+    });
+
+    it("should maintain correct move numbering after deletion", () => {
+      const manager = new PGNManager(simplePGN);
+      manager.deleteMove(5);
+
+      const moves: Move[] = [];
+      let currentMove = manager.getFirstMove();
+      moves.push(currentMove);
+      while (manager.hasNextMove(currentMove)) {
+        currentMove = manager.nextMove(currentMove);
+        moves.push(currentMove);
+      }
+
+      console.log(moves);
+
+      expect(moves[2].move_number).toBe(2);
+      expect(moves[3].move_number).toBe(undefined);
+    });
+
+    it("should handle deleting the first move", () => {
+      const manager = new PGNManager(simplePGN);
+      manager.deleteMove(1);
+      expect(manager.parsedPGN.moves.length).toBe(0);
+      expect(() => manager.getFirstMove()).toThrow("No moves in game");
     });
   });
 });

@@ -271,7 +271,7 @@ class PGNManager {
   public getMoveFen = (moveOrId: Move | number): string => {
     const move =
       typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
-    if (!move) {
+    if (!move || !this.moveFen.has(move)) {
       throw Error("Invalid 'move' parameter while getting fen");
     }
     let moveFen = this.moveFen.get(move);
@@ -287,7 +287,7 @@ class PGNManager {
   public getParentRav = (moveOrId: Move | number): Rav | null => {
     const move =
       typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
-    if (!move) {
+    if (!move || !this.moveParent.has(move)) {
       throw Error("Invalid 'move' parameter while getting parent rav");
     }
     let parentRav = this.moveParent.get(move);
@@ -303,7 +303,7 @@ class PGNManager {
   public getMoveColor = (moveOrId: Move | number): "w" | "b" => {
     const move =
       typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
-    if (!move) {
+    if (!move || !this.moveColor.has(move)) {
       throw Error("Invalid 'move' parameter while getting move color");
     }
     return this.moveColor.get(move);
@@ -313,6 +313,9 @@ class PGNManager {
    * Pushes a new move into the game
    * @param moveId - The ID of the move to push
    * @param newMove - The move object to add
+   * @param result - The result of the game after this move (default is "*")
+   * @returns The newly created move object
+   * @throws Error if the move parameter is invalid
    */
   public pushMove = (
     moveId: number,
@@ -375,10 +378,58 @@ class PGNManager {
       );
     }
 
-    this.rawPGN = regeneratePGN(this.game);
+    this.rawPGN = regeneratePGN(this.game, this.moveColor);
     this.dfOnGame(this.game);
 
     return move;
+  };
+
+  /**
+   * Delete a move and all subsequent moves in its variation from the game
+   * @param moveId - The ID of the move to delete from
+   * @throws Error if the move parameter is invalid
+   */
+  public deleteMove = (moveId: number): void => {
+    const move = this.getMove(moveId);
+    if (!move) {
+      throw Error("Invalid move");
+    }
+
+    // delete the move and subsequent moves from the game
+    const parentRav = this.getParentRav(move);
+    const index = parentRav.moves.indexOf(move);
+    const deletedMoves = parentRav.moves.splice(index);
+
+    // collect all moves and variations that need cleanup
+    const movsToClean = [];
+    const ravsToClean = [];
+
+    for (const deletedMove of deletedMoves) {
+      movsToClean.push(deletedMove);
+      if (deletedMove.ravs) {
+        for (const rav of deletedMove.ravs) {
+          ravsToClean.push(rav);
+        }
+      }
+    }
+
+    // Sort moves by their moveId in decreasing order
+    movsToClean.sort((a, b) => this.getMoveNumber(b) - this.getMoveNumber(a));
+
+    // clean up all maps at once
+    movsToClean.forEach((move) => {
+      this.moveParent.delete(move);
+      this.moveFen.delete(move);
+      this.moveColor.delete(move);
+    });
+
+    ravsToClean.forEach((rav) => {
+      this.ravParent.delete(rav);
+    });
+
+    // update the PGN and rebuild internal state
+    this.rawPGN = regeneratePGN(this.game, this.moveColor);
+    this.dfOnGame(this.game);
   };
 }
 
