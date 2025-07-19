@@ -1,11 +1,13 @@
 {
   "name": "pgn-manager",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Libraray built on top of chess.js and pgn-parser to load and process PGN files in typescript.",
   "main": "dist/index",
   "typings": "dist/index",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "prepublishOnly": "npm run compile",
     "compile": "npm run clean && tsc -p .",
     "watch": "tsc -w -p .",
@@ -32,6 +34,10 @@
   },
   "devDependencies": {
     "@types/chess.js": "^0.11.2",
+    "@types/jest": "^30.0.0",
+    "@types/pgn-parser": "^2.1.0",
+    "jest": "^30.0.4",
+    "ts-jest": "^29.4.0",
     "typescript": "4.5.2"
   },
   "files": [
