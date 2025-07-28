@@ -329,7 +329,7 @@ class PGNManager {
     let parentRav: Rav;
     let current: Move | null = null;
 
-    // 1) Initialize ChessJS & parentRav
+    // 1) Initialize Chess and parent variation
     if (moveId === 0) {
       parentRav = this.parsedPGN;
       const fenHdr = this.headers.find((h) => h.name.toLowerCase() === "fen");
@@ -342,68 +342,80 @@ class PGNManager {
       chess = new Chess(this.getMoveFen(current));
     }
 
-    // 2) Play the move (strict → sloppy)
+    // 2) Play the SAN move (strict → sloppy)
     const played =
       chess.move(newMove, { sloppy: false }) ||
       chess.move(newMove, { sloppy: true });
     if (!played) throw new Error("Invalid move");
 
     const san = chess.history().slice(-1)[0];
-    const nextColor = chess.turn() === "w" ? "b" : "w";
+    const nextToMove = chess.turn(); // 'w' or 'b'
 
-    // 3) Build the Move object
+    // 3) Build move object with provisional move_number
+    const provisionalNumber = (() => {
+      if (!current) {
+        return 1; // brand‐new mainline
+      }
+      const currNum =
+        current.move_number || this.previousMove(current)?.move_number;
+      const currColor = this.getMoveColor(current);
+      return currColor === "w" ? currNum : currNum + 1;
+    })();
+
     const moveObj: Move = {
       move: san,
       ravs: undefined,
-      move_number: current
-        ? this.getMoveColor(current) === "w"
-          ? current.move_number
-          : current.move_number + 1
-        : 1,
+      move_number: provisionalNumber,
       comments: [],
     };
 
-    // 4) Insert into your data structures
+    // 4) Insert into structure & flag first‐of‐variation
+    let isFirstOfVariation = false;
+
     if (!current) {
-      // --- BRAND-NEW MAINLINE: variation of first move if exists ---
+      // brand-new mainline => variation of first move if exists
       const first = parentRav.moves[0];
       if (first) {
-        // create a new RAV off the first move
+        isFirstOfVariation = true;
         const newRav: Rav = { moves: [moveObj], result };
-        if (!first.ravs) first.ravs = [];
+        first.ravs = first.ravs || [];
         first.ravs.push(newRav);
-
-        // bookkeeping
         this.moveParent.set(moveObj, newRav);
         this.ravParent.set(newRav, first);
       } else {
-        // no first move yet → push into mainline
         parentRav.moves.push(moveObj);
         this.moveParent.set(moveObj, parentRav);
       }
     } else {
-      // existing‐move branch (continuation or variation off next move)
-      const parentVariation =
-        parentRav.moves[parentRav.moves.length - 1] !== current;
-      if (parentVariation) {
+      // existing‐move branch
+      const lastInRav = parentRav.moves[parentRav.moves.length - 1];
+      const isContinuation = lastInRav === current;
+
+      if (!isContinuation) {
         // new variation off the next move
+        isFirstOfVariation = true;
         const anchor = this.nextMove(current) || current;
-        if (!anchor.ravs) anchor.ravs = [];
+        anchor.ravs = anchor.ravs || [];
         const newRav: Rav = { moves: [moveObj], result };
         anchor.ravs.push(newRav);
-
         this.moveParent.set(moveObj, newRav);
         this.ravParent.set(newRav, anchor);
       } else {
-        // simple continuation
+        // continuation
         parentRav.moves.push(moveObj);
         this.moveParent.set(moveObj, parentRav);
       }
     }
 
-    // 5) Update FEN, color, PGN, and callbacks
+    // 5) Conditionally remove move_number
+    // Keep it only if first‐of‐variation OR new move is White to play
+    if (!(isFirstOfVariation || nextToMove === "b")) {
+      delete moveObj.move_number;
+    }
+
+    // 6) Final bookkeeping
     this.moveFen.set(moveObj, chess.fen());
-    this.moveColor.set(moveObj, nextColor);
+    this.moveColor.set(moveObj, nextToMove === "w" ? "b" : "w");
     this.rawPGN = regeneratePGN(this.game, this.moveColor);
     this.dfOnGame(this.game);
 
