@@ -56,7 +56,10 @@ class PGNManager {
   private dfOnGame = (game: ParsedPGN) => {
     this.sortedMoves = [];
 
-    var chessGame = new Chess(FEN_START_POSITION);
+    var chessGame = new Chess(
+      game.headers?.find((h) => h.name.toUpperCase() === "FEN")?.value ||
+        FEN_START_POSITION
+    );
 
     for (let move of game.moves) {
       this.dfsOnGame(move, game, chessGame);
@@ -322,66 +325,89 @@ class PGNManager {
     newMove: ShortMove,
     result: Result = "*"
   ): Move => {
-    const currentMove = this.getMove(moveId);
+    let chess: ChessJS.ChessInstance;
+    let parentRav: Rav;
+    let current: Move | null = null;
 
-    // check if it's a valid move
-    const chess = new Chess(this.getMoveFen(currentMove));
-    if (!chess.move(newMove)) {
-      throw Error("Invalid move");
-    }
-
-    // check if this is a new variation
-    let isNewVariation = false;
-    const parentRav = this.getParentRav(currentMove);
-    if (parentRav.moves[parentRav.moves.length - 1] != currentMove) {
-      isNewVariation = true;
-    }
-
-    // add the move to the game
-    let move = undefined;
-    if (isNewVariation) {
-      move = {
-        move: chess.history().slice(-1)[0],
-        ravs: undefined,
-        move_number: currentMove.move_number,
-        comments: [],
-      };
-      const newVar: Rav = {
-        moves: [move],
-        result,
-      };
-      currentMove.ravs.push(newVar);
-
-      // update class variables
-      this.moveParent.set(move, newVar);
-      this.ravParent.set(newVar, currentMove);
-      this.moveFen.set(move, chess.fen());
-      this.moveColor.set(move, this.getMoveColor(currentMove));
+    // 1) Initialize ChessJS & parentRav
+    if (moveId === 0) {
+      parentRav = this.parsedPGN;
+      const fenHdr = this.headers.find((h) => h.name.toLowerCase() === "fen");
+      const startFen = fenHdr ? fenHdr.value : FEN_START_POSITION;
+      chess = new Chess(startFen);
     } else {
-      move = {
-        move: chess.history().slice(-1)[0],
-        ravs: undefined,
-        move_number:
-          this.getMoveColor(currentMove) === "w"
-            ? undefined
-            : currentMove.move_number + 1,
-        comments: [],
-      };
-      parentRav.moves.push(move);
-
-      // update class variables
-      this.moveParent.set(move, parentRav);
-      this.moveFen.set(move, chess.fen());
-      this.moveColor.set(
-        move,
-        this.getMoveColor(currentMove) === "w" ? "b" : "w"
-      );
+      current = this.getMove(moveId);
+      if (!current) throw new Error("Invalid moveId while pushing a new move!");
+      parentRav = this.moveParent.get(current) || this.parsedPGN;
+      chess = new Chess(this.getMoveFen(current));
     }
 
+    // 2) Play the move (strict → sloppy)
+    const played =
+      chess.move(newMove, { sloppy: false }) ||
+      chess.move(newMove, { sloppy: true });
+    if (!played) throw new Error("Invalid move");
+
+    const san = chess.history().slice(-1)[0];
+    const nextColor = chess.turn() === "w" ? "b" : "w";
+
+    // 3) Build the Move object
+    const moveObj: Move = {
+      move: san,
+      ravs: undefined,
+      move_number: current
+        ? this.getMoveColor(current) === "w"
+          ? current.move_number
+          : current.move_number + 1
+        : 1,
+      comments: [],
+    };
+
+    // 4) Insert into your data structures
+    if (!current) {
+      // --- BRAND-NEW MAINLINE: variation of first move if exists ---
+      const first = parentRav.moves[0];
+      if (first) {
+        // create a new RAV off the first move
+        const newRav: Rav = { moves: [moveObj], result };
+        if (!first.ravs) first.ravs = [];
+        first.ravs.push(newRav);
+
+        // bookkeeping
+        this.moveParent.set(moveObj, newRav);
+        this.ravParent.set(newRav, first);
+      } else {
+        // no first move yet → push into mainline
+        parentRav.moves.push(moveObj);
+        this.moveParent.set(moveObj, parentRav);
+      }
+    } else {
+      // existing‐move branch (continuation or variation off next move)
+      const parentVariation =
+        parentRav.moves[parentRav.moves.length - 1] !== current;
+      if (parentVariation) {
+        // new variation off the next move
+        const anchor = this.nextMove(current) || current;
+        if (!anchor.ravs) anchor.ravs = [];
+        const newRav: Rav = { moves: [moveObj], result };
+        anchor.ravs.push(newRav);
+
+        this.moveParent.set(moveObj, newRav);
+        this.ravParent.set(newRav, anchor);
+      } else {
+        // simple continuation
+        parentRav.moves.push(moveObj);
+        this.moveParent.set(moveObj, parentRav);
+      }
+    }
+
+    // 5) Update FEN, color, PGN, and callbacks
+    this.moveFen.set(moveObj, chess.fen());
+    this.moveColor.set(moveObj, nextColor);
     this.rawPGN = regeneratePGN(this.game, this.moveColor);
     this.dfOnGame(this.game);
 
-    return move;
+    return moveObj;
   };
 
   /**
