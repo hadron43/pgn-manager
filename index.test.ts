@@ -1,3 +1,5 @@
+import * as ChessJS from "chess.js";
+const Chess = typeof ChessJS === "function" ? ChessJS : ChessJS.Chess;
 import PGNManager, { FEN_START_POSITION, FEN_EMPTY_POSITION } from "./index";
 import { Move } from "pgn-parser";
 
@@ -32,6 +34,8 @@ describe("PGNManager", () => {
 
 *`;
 
+  const pgnWithStartingPosition = `[FEN "6N1/6KN/8/8/8/8/6q1/7k w - - 0 1"]`;
+
   describe("Constructor", () => {
     it("should create a PGNManager instance with valid PGN", () => {
       const manager = new PGNManager(simplePGN);
@@ -43,6 +47,15 @@ describe("PGNManager", () => {
       expect(manager.pgn).toBe(simplePGN);
       expect(manager.headers).toHaveLength(7);
       expect(manager.parsedPGN).toBeDefined();
+    });
+
+    it("Should load PGN with initial position", () => {
+      const manager = new PGNManager(pgnWithStartingPosition);
+      const chess = new Chess(
+        manager.headers.find((header) => header.name.toUpperCase() === "FEN")
+          ?.value || "Error"
+      );
+      expect(chess.fen()).toEqual("6N1/6KN/8/8/8/8/6q1/7k w - - 0 1");
     });
   });
 
