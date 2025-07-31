@@ -23,6 +23,9 @@ class PGNManager {
   /** Map of moves to their FEN position strings */
   private moveFen: Map<Move, string>;
 
+  /** Map of FEN position string to their move object */
+  private fenMove: Map<string, Move> = new Map();
+
   /** Map of moves to their parent variations (or null for mainline) */
   private moveParent: Map<Move, Rav | null>;
 
@@ -44,6 +47,7 @@ class PGNManager {
     this.moveParent = new Map();
     this.ravParent = new Map();
     this.moveFen = new Map();
+    this.fenMove = new Map();
     this.moveColor = new Map();
 
     this.dfOnGame(this.game);
@@ -98,6 +102,7 @@ class PGNManager {
     )
       console.log("Invalid move: " + move.move);
     this.moveFen.set(move, chessGame.fen());
+    this.fenMove.set(chessGame.fen(), move);
     this.moveColor.set(move, chessGame.turn() === "w" ? "b" : "w");
   };
 
@@ -351,6 +356,11 @@ class PGNManager {
     const san = chess.history().slice(-1)[0];
     const nextToMove = chess.turn(); // 'w' or 'b'
 
+    // If the FEN already exists, we are trying to add a move that is already played
+    if (this.fenMove.has(chess.fen())) {
+      return this.fenMove.get(chess.fen());
+    }
+
     // 3) Build move object with provisional move_number
     const provisionalNumber = (() => {
       if (!current) {
@@ -415,6 +425,7 @@ class PGNManager {
 
     // 6) Final bookkeeping
     this.moveFen.set(moveObj, chess.fen());
+    this.fenMove.set(chess.fen(), moveObj);
     this.moveColor.set(moveObj, nextToMove === "w" ? "b" : "w");
     this.rawPGN = regeneratePGN(this.game, this.moveColor);
     this.dfOnGame(this.game);
@@ -457,6 +468,7 @@ class PGNManager {
     // clean up all maps at once
     movsToClean.forEach((move) => {
       this.moveParent.delete(move);
+      this.fenMove.delete(this.getMoveFen(move));
       this.moveFen.delete(move);
       this.moveColor.delete(move);
     });
