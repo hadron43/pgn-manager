@@ -1,6 +1,6 @@
 {
   "name": "pgn-manager",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "description": "Libraray built on top of chess.js and pgn-parser to load and process PGN files in typescript.",
   "main": "dist/index",
   "typings": "dist/index",
