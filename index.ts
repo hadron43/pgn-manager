@@ -380,7 +380,7 @@ class PGNManager {
     };
 
     // 4) Insert into structure & flag first‐of‐variation
-    let isFirstOfVariation = false;
+    let isFirstOfVariation = !current;
 
     if (!current) {
       // brand-new mainline => variation of first move if exists
