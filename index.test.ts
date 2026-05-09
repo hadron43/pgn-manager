@@ -1,5 +1,4 @@
-import * as ChessJS from "chess.js";
-const Chess = typeof ChessJS === "function" ? ChessJS : ChessJS.Chess;
+import { Chess } from "void57-chess";
 import PGNManager, { FEN_START_POSITION, FEN_EMPTY_POSITION } from "./index";
 import { Move } from "pgn-parser";
 
@@ -53,7 +52,7 @@ describe("PGNManager", () => {
       const manager = new PGNManager(pgnWithStartingPosition);
       const chess = new Chess(
         manager.headers.find((header) => header.name.toUpperCase() === "FEN")
-          ?.value || "Error"
+          ?.value || "Error",
       );
       expect(chess.fen()).toEqual("6N1/6KN/8/8/8/8/6q1/7k w - - 0 1");
     });
@@ -161,7 +160,7 @@ describe("PGNManager", () => {
     it("should throw error for empty game", () => {
       const emptyManager = new PGNManager(emptyPGN);
       expect(() => emptyManager.nextMove(undefined)).toThrow(
-        "No moves in game"
+        "No moves in game",
       );
     });
 
@@ -200,7 +199,7 @@ describe("PGNManager", () => {
 
     it("should throw error for invalid move", () => {
       expect(() => manager.previousMove(null as any)).toThrow(
-        "Invalid 'move' parameter while getting previous move"
+        "Invalid 'move' parameter while getting previous move",
       );
     });
 
@@ -232,7 +231,7 @@ describe("PGNManager", () => {
 
     it("should throw error for invalid move object", () => {
       expect(() => manager.getMoveFen(undefined as any)).toThrow(
-        "Invalid 'move' parameter while getting fen"
+        "Invalid 'move' parameter while getting fen",
       );
     });
   });
@@ -259,7 +258,7 @@ describe("PGNManager", () => {
 
     it("should throw error for invalid move when getting color", () => {
       expect(() => manager.getMoveColor(null as any)).toThrow(
-        "Invalid 'move' parameter while getting move color"
+        "Invalid 'move' parameter while getting move color",
       );
     });
 
@@ -276,7 +275,7 @@ describe("PGNManager", () => {
 
     it("should throw error for invalid move when getting parent RAV", () => {
       expect(() => manager.getParentRav(null as any)).toThrow(
-        "Invalid 'move' parameter while getting parent rav"
+        "Invalid 'move' parameter while getting parent rav",
       );
     });
   });
@@ -331,7 +330,7 @@ describe("PGNManager", () => {
         expect(newMove.move).toBeDefined();
       } catch (error) {
         // Expected for invalid moves
-        expect(error.message).toBe("Invalid move");
+        expect((error as Error).message).toBe("Invalid move");
       }
     });
 
@@ -357,7 +356,7 @@ describe("PGNManager", () => {
         expect(manager.pgn).not.toBe(originalPGN);
       } catch (error) {
         // Expected for invalid moves
-        expect(error.message).toBe("Invalid move");
+        expect((error as Error).message).toBe("Invalid move");
       }
     });
   });
@@ -388,7 +387,7 @@ describe("PGNManager", () => {
   describe("Constants", () => {
     it("should export FEN constants", () => {
       expect(FEN_START_POSITION).toBe(
-        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       );
       expect(FEN_EMPTY_POSITION).toBe("8/8/8/8/8/8/8/8");
     });
@@ -485,6 +484,145 @@ describe("PGNManager", () => {
       manager.deleteMove(1);
       expect(manager.parsedPGN.moves.length).toBe(0);
       expect(() => manager.getFirstMove()).toThrow("No moves in game");
+    });
+  });
+
+  describe("Chess960", () => {
+    const chess960PGN = `[Event "Chess960 Game"]
+[Site "Test"]
+[Date "2024.01.01"]
+[Round "1"]
+[White "Player1"]
+[Black "Player2"]
+[Result "*"]
+[Variant "Chess960"]
+[FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]
+
+1. e4 e5 2. Nf3 Nc6 *`;
+
+    // Position 518 is standard chess — use it to verify Chess960 class works with standard position
+    const chess960Position518PGN = `[Event "Chess960 Pos 518"]
+[Variant "Chess960"]
+[FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]
+
+1. e4 e5 *`;
+
+    it("should detect Chess960 game from Variant header", () => {
+      const manager = new PGNManager(chess960PGN);
+      expect(manager.isChess960).toBe(true);
+    });
+
+    it("should not detect standard game as Chess960", () => {
+      const manager = new PGNManager(simplePGN);
+      expect(manager.isChess960).toBe(false);
+    });
+
+    it("should load and traverse Chess960 game moves", () => {
+      const manager = new PGNManager(chess960PGN);
+      expect(manager.parsedPGN.moves).toHaveLength(4);
+
+      const firstMove = manager.getFirstMove();
+      expect(firstMove.move).toBe("e4");
+
+      const secondMove = manager.nextMove(firstMove);
+      expect(secondMove.move).toBe("e5");
+    });
+
+    it("should return correct FEN for Chess960 moves", () => {
+      const manager = new PGNManager(chess960PGN);
+      const fen = manager.getMoveFen(1);
+      expect(fen).toBeDefined();
+      expect(fen).toContain("rnbqkbnr"); // black pieces still in start position
+    });
+
+    it("should return correct move colors in Chess960", () => {
+      const manager = new PGNManager(chess960PGN);
+      expect(manager.getMoveColor(1)).toBe("w");
+      expect(manager.getMoveColor(2)).toBe("b");
+    });
+
+    it("should detect FischerRandom variant (case insensitive)", () => {
+      const frPGN = `[Variant "FischerRandom"]
+
+1. e4 e5 *`;
+      const manager = new PGNManager(frPGN);
+      expect(manager.isChess960).toBe(true);
+    });
+
+    describe("Real Chess960 game (Carlsen vs Caruana)", () => {
+      const carlsenCaruanaPGN = `[Event "FIDE Freestyle Chess World Championship KO"]
+[Site "https://lichess.org/broadcast/fide-freestyle-chess-world-championship-2026--finals/game-4/HvRKiQmq/35yfRSPb"]
+[Date "2026.02.11"]
+[Round "9.1"]
+[White "Carlsen, Magnus"]
+[Black "Caruana, Fabiano"]
+[Result "1/2-1/2"]
+[WhiteElo "2887"]
+[WhiteTitle "GM"]
+[WhiteTeam "Finals"]
+[WhiteFideId "1503014"]
+[BlackElo "2809"]
+[BlackTitle "GM"]
+[BlackTeam "Finals"]
+[BlackFideId "2020009"]
+[TimeControl "25+10"]
+[Variant "Chess960"]
+[ECO "?"]
+[Opening "?"]
+[FEN "rbknqrbn/pppppppp/8/8/8/8/PPPPPPPP/RBKNQRBN w KQkq - 0 1"]
+[SetUp "1"]
+[UTCDate "2026.02.11"]
+[UTCTime "12:48:55"]
+[BroadcastName "FIDE Freestyle Chess World Championship 2026 | Finals"]
+[BroadcastURL "https://lichess.org/broadcast/fide-freestyle-chess-world-championship-2026--finals/game-4/HvRKiQmq"]
+[GameURL "https://lichess.org/broadcast/fide-freestyle-chess-world-championship-2026--finals/game-4/HvRKiQmq/35yfRSPb"]
+
+1. f4 { [%eval 0.05] [%clk 0:23:19] } 1... f5 { [%eval 0.13] [%clk 0:25:15] } 2. c3 { [%eval 0.15] [%clk 0:23:12] } 2... a5 { [%eval 0.57] [%clk 0:23:48] } 3. Ng3 { [%eval 0.54] [%clk 0:23:11] } 3... g6 { [%eval 0.73] [%clk 0:23:48] } 4. e4 { [%eval 0.72] [%clk 0:23:17] } 4... fxe4 { [%eval 0.79] [%clk 0:23:55] } 5. Nxe4 { [%eval 0.67] [%clk 0:23:17] } 5... Nhf7 { [%eval 0.64] [%clk 0:22:29] } 6. Ne3 { [%eval 0.61] [%clk 0:22:30] } 6... a4 { [%eval 0.71] [%clk 0:20:21] } 7. Bc2 { [%eval 0.46] [%clk 0:21:03] } 7... Nh6 { [%eval 0.71] [%clk 0:14:03] } 8. g4 { [%eval 0.81] [%clk 0:16:41] } 8... d5 { [%eval 0.69] [%clk 0:12:19] } 9. Nc5 { [%eval 0.92] [%clk 0:14:24] } 9... b6 { [%eval 1.15] [%clk 0:10:58] } 10. Nd3 { [%eval 1.13] [%clk 0:13:58] } 10... c6 { [%eval 1.06] [%clk 0:11:05] } 11. f5 { [%eval 0.62] [%clk 0:10:55] } 11... Nhf7 { [%eval 1.14] [%clk 0:06:42] } 12. Nf4 { [%eval 0.35] [%clk 0:08:19] } 12... Ne5 { [%eval 1.44] [%clk 0:06:40] } 13. d4 { [%eval 1.1] [%clk 0:07:31] } 13... Nd7 { [%eval 0.94] [%clk 0:06:49] } 14. O-O-O { [%eval 0.9] [%clk 0:06:54] } 14... gxf5 { [%eval 1.04] [%clk 0:05:43] } 15. gxf5 { [%eval 0.98] [%clk 0:06:33] } 15... Bf7 { [%eval 1.38] [%clk 0:03:50] } 16. a3 { [%eval 1.34] [%clk 0:05:19] } 16... Rg8 { [%eval 1.43] [%clk 0:03:45] } 17. Nd3 { [%eval 1.11] [%clk 0:04:20] } 17... Bh5 { [%eval 1.37] [%clk 0:03:13] } 18. Rd2 { [%eval 1.38] [%clk 0:04:27] } 18... Nf7 { [%eval 1.68] [%clk 0:03:21] } 19. Nb4 { [%eval 1.18] [%clk 0:02:36] } 19... Nf6 { [%eval 1.09] [%clk 0:03:21] } 20. c4 { [%eval 1.22] [%clk 0:02:43] } 20... Bd6 { [%eval 1.08] [%clk 0:02:20] } 21. Nd3 { [%eval 0.7] [%clk 0:01:44] } 21... Ne4 { [%eval 1.59] [%clk 0:02:11] } 22. Rg2 { [%eval 1.46] [%clk 0:01:25] } 22... Nfg5 { [%eval 1.94] [%clk 0:01:12] } 23. cxd5 { [%eval 0.03] [%clk 0:00:32] } 23... Nf3 { [%eval 0.0] [%clk 0:01:21] } 24. Rxg8 { [%eval 0.0] [%clk 0:00:22] } 24... Qxg8 { [%eval 0.0] [%clk 0:01:29] } 25. Qe2 { [%eval -2.1] [%clk 0:00:14] } 25... Qg5 { [%eval 0.0] [%clk 0:01:28] } 26. Qg2 { [%eval 0.0] [%clk 0:00:23] } 26... Qxg2 { [%eval 0.0] [%clk 0:00:39] } 27. Nxg2 { [%eval 0.0] [%clk 0:00:32] } 27... Ned2 { [%eval 0.0] [%clk 0:00:45] } 28. Rf2 { [%eval 0.0] [%clk 0:00:21] } 28... Nxg1 { [%eval 1.53] [%clk 0:00:22] } 29. Kxd2 { [%eval 1.51] [%clk 0:00:29] } 29... Nh3 { [%eval 1.53] [%clk 0:00:13] } 30. Rf1 { [%eval 1.46] [%clk 0:00:37] } 30... cxd5 { [%eval 1.57] [%clk 0:00:21] } 31. Ngf4 { [%eval 1.18] [%clk 0:00:19] } 31... Nxf4 { [%eval 0.7] [%clk 0:00:29] } 32. Nxf4 { [%eval 1.32] [%clk 0:00:27] } 32... Bf7 { [%eval 1.39] [%clk 0:00:38] } 33. Ke3 { [%eval 0.93] [%clk 0:00:32] } 33... b5 { [%eval 2.35] [%clk 0:00:14] } 34. Rg1 { [%eval 2.17] [%clk 0:00:40] } 34... Kd7 { [%eval 2.57] [%clk 0:00:22] } 35. Rg7 { [%eval 2.46] [%clk 0:00:46] } 35... Bg8 { [%eval 2.35] [%clk 0:00:15] } 36. f6 { [%eval 0.2] [%clk 0:00:41] } 36... Rf8 { [%eval 0.23] [%clk 0:00:17] } 37. Bf5+ { [%eval 0.24] [%clk 0:00:15] } 37... Ke8 { [%eval 3.14] [%clk 0:00:26] } 38. Bxh7 { [%eval 0.0] [%clk 0:00:13] } 38... Bxh7 { [%eval 0.02] [%clk 0:00:16] } 39. Rxh7 { [%eval -0.01] [%clk 0:00:22] } 39... Rxf6 { [%eval 0.0] [%clk 0:00:25] } 40. Nxd5 { [%eval 0.0] [%clk 0:00:30] } 40... Rg6 { [%eval 0.01] [%clk 0:00:13] } 41. Nc3 { [%eval 0.0] [%clk 0:00:33] } 41... Rg2 { [%eval 0.0] [%clk 0:00:20] } 42. Nxb5 { [%eval 0.0] [%clk 0:00:39] } 42... Bxh2 { [%eval 0.0] [%clk 0:00:28] } 43. Nc3 { [%eval 0.0] [%clk 0:00:35] } 43... Rxb2 { [%eval 0.0] [%clk 0:00:33] } 44. Nxa4 { [%eval 0.0] [%clk 0:00:42] } 44... Rb3+ { [%eval 0.0] [%clk 0:00:42] } 45. Ke4 { [%eval 0.0] [%clk 0:00:51] } 45... Rxa3 { [%eval 0.02] [%clk 0:00:50] } 46. Rxh2 { [%eval 0.0] [%clk 0:00:57] } 46... Rxa4 { [%eval 0.0] [%clk 0:00:59] } 1/2-1/2`;
+
+      let manager: PGNManager;
+
+      beforeEach(() => {
+        manager = new PGNManager(carlsenCaruanaPGN);
+      });
+
+      it("should detect as Chess960", () => {
+        expect(manager.isChess960).toBe(true);
+      });
+
+      it("should load all 92 half-moves", () => {
+        expect(manager.parsedPGN.moves).toHaveLength(92);
+      });
+
+      it("should have correct FEN after O-O-O (move 14)", () => {
+        // Move 14 is O-O-O (white's 14th move = half-move 27)
+        // Find O-O-O move
+        let oooMove: Move | undefined;
+        for (let i = 1; i <= 92; i++) {
+          const m = manager.getMove(i);
+          if (m.move === "O-O-O") {
+            oooMove = m;
+            break;
+          }
+        }
+        expect(oooMove).toBeDefined();
+        expect(oooMove!.move).toBe("O-O-O");
+
+        const fen = manager.getMoveFen(oooMove!);
+        // Chess960 uses X-FEN: castling rights use file letters (f = rook on f-file)
+        expect(fen).toBe(
+          "rbknqrb1/3np2p/1pp3p1/3p1P2/p2P1NP1/2P1N3/PPB4P/2KRQRB1 b fq - 2 14",
+        );
+      });
+
+      it("should traverse the full game without errors", () => {
+        let currentMove = manager.getFirstMove();
+        let count = 1;
+        while (manager.hasNextMove(currentMove)) {
+          currentMove = manager.nextMove(currentMove);
+          count++;
+        }
+        expect(count).toBe(92);
+      });
     });
   });
 });
