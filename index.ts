@@ -1,6 +1,4 @@
-import * as ChessJS from "chess.js";
-const Chess = typeof ChessJS === "function" ? ChessJS : ChessJS.Chess;
-import { ShortMove } from "chess.js";
+import { Chess, Chess960 } from "void57-chess";
 import * as pgnParser from "pgn-parser";
 import type { ParsedPGN, Move, Rav, Header, Result } from "pgn-parser";
 
@@ -9,6 +7,40 @@ import { regeneratePGN } from "./utils";
 export const FEN_START_POSITION =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 export const FEN_EMPTY_POSITION = "8/8/8/8/8/8/8/8";
+
+/** Move input type for pushMove — from/to with optional promotion */
+export type ShortMove = {
+  from: string;
+  to: string;
+  promotion?: string;
+};
+
+/** Shared instance type for both Chess and Chess960 */
+type ChessInstance = Chess | Chess960;
+
+/** Known variant header values that indicate Chess960 */
+const CHESS960_VARIANTS = ["chess960", "fischerandom", "fischerrandom"];
+
+/**
+ * Determines whether the game is a Chess960 game based on PGN headers
+ */
+function isChess960Game(headers?: Header[]): boolean {
+  if (!headers) return false;
+  const variant = headers.find(
+    (h) => h.name.toLowerCase() === "variant"
+  )?.value;
+  return variant ? CHESS960_VARIANTS.includes(variant.toLowerCase()) : false;
+}
+
+/**
+ * Creates the appropriate Chess or Chess960 instance based on game headers
+ */
+function createChessInstance(fen: string, headers?: Header[]): ChessInstance {
+  if (isChess960Game(headers)) {
+    return new Chess960(fen);
+  }
+  return new Chess(fen);
+}
 
 class PGNManager {
   /** The raw PGN string input */
@@ -35,6 +67,9 @@ class PGNManager {
   /** Map of moves to the color of the player who made the move */
   private moveColor: Map<Move, "w" | "b">;
 
+  /** Whether this game is a Chess960 game */
+  private _isChess960: boolean;
+
   /**
    * Creates a new PGNManager instance
    * @param pgn - The PGN string to parse and manage
@@ -49,8 +84,16 @@ class PGNManager {
     this.moveFen = new Map();
     this.fenMove = new Map();
     this.moveColor = new Map();
+    this._isChess960 = isChess960Game(this.game.headers);
 
     this.dfOnGame(this.game);
+  }
+
+  /**
+   * Returns whether this game is a Chess960 game
+   */
+  public get isChess960(): boolean {
+    return this._isChess960;
   }
 
   /**
@@ -60,10 +103,11 @@ class PGNManager {
   private dfOnGame = (game: ParsedPGN) => {
     this.sortedMoves = [];
 
-    var chessGame = new Chess(
+    const startFen =
       game.headers?.find((h) => h.name.toUpperCase() === "FEN")?.value ||
-        FEN_START_POSITION
-    );
+      FEN_START_POSITION;
+
+    var chessGame = createChessInstance(startFen, game.headers);
 
     for (let move of game.moves) {
       this.dfsOnGame(move, game, chessGame);
@@ -79,7 +123,7 @@ class PGNManager {
   private dfsOnGame = (
     move: Move,
     parent: Rav,
-    chessGame: ChessJS.ChessInstance
+    chessGame: ChessInstance
   ) => {
     this.sortedMoves.push(move);
     this.moveParent.set(move, parent);
@@ -87,7 +131,10 @@ class PGNManager {
     if (move.ravs) {
       for (let rav of move.ravs) {
         this.ravParent.set(rav, move);
-        let newVarChessGame = new Chess(chessGame.fen());
+        let newVarChessGame = createChessInstance(
+          chessGame.fen(),
+          this.game.headers
+        );
 
         for (let ravMove of rav.moves) {
           this.dfsOnGame(ravMove, rav, newVarChessGame);
@@ -96,11 +143,11 @@ class PGNManager {
     }
 
     // move only after variations are processed
-    if (
-      !chessGame.move(move.move, { sloppy: false }) &&
-      !chessGame.move(move.move, { sloppy: true })
-    )
+    try {
+      chessGame.move(move.move);
+    } catch {
       console.log("Invalid move: " + move.move);
+    }
     this.moveFen.set(move, chessGame.fen());
     this.fenMove.set(chessGame.fen(), move);
     this.moveColor.set(move, chessGame.turn() === "w" ? "b" : "w");
@@ -330,7 +377,7 @@ class PGNManager {
     newMove: ShortMove,
     result: Result = "*"
   ): Move => {
-    let chess: ChessJS.ChessInstance;
+    let chess: ChessInstance;
     let parentRav: Rav;
     let current: Move | null = null;
 
@@ -339,18 +386,24 @@ class PGNManager {
       parentRav = this.parsedPGN;
       const fenHdr = this.headers.find((h) => h.name.toLowerCase() === "fen");
       const startFen = fenHdr ? fenHdr.value : FEN_START_POSITION;
-      chess = new Chess(startFen);
+      chess = createChessInstance(startFen, this.game.headers);
     } else {
       current = this.getMove(moveId);
       if (!current) throw new Error("Invalid moveId while pushing a new move!");
       parentRav = this.moveParent.get(current) || this.parsedPGN;
-      chess = new Chess(this.getMoveFen(current));
+      chess = createChessInstance(
+        this.getMoveFen(current),
+        this.game.headers
+      );
     }
 
-    // 2) Play the SAN move (strict → sloppy)
-    const played =
-      chess.move(newMove, { sloppy: false }) ||
-      chess.move(newMove, { sloppy: true });
+    // 2) Play the move
+    let played;
+    try {
+      played = chess.move(newMove);
+    } catch {
+      played = null;
+    }
     if (!played) throw new Error("Invalid move");
 
     const san = chess.history().slice(-1)[0];
