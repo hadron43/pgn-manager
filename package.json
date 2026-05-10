@@ -30,7 +30,7 @@
   "homepage": "https://github.com/hadron43/pgn-manager#readme",
   "dependencies": {
     "pgn-parser": "2.1.0",
-    "void57-chess": "1.0.2"
+    "void57-chess": "^1.0.4"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
