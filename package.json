@@ -1,6 +1,6 @@
 {
   "name": "pgn-manager",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Libraray built on top of chess.js and pgn-parser to load and process PGN files in typescript.",
   "main": "dist/index",
   "typings": "dist/index",
@@ -30,7 +30,7 @@
   "homepage": "https://github.com/hadron43/pgn-manager#readme",
   "dependencies": {
     "pgn-parser": "2.1.0",
-    "void57-chess": "1.0.2"
+    "void57-chess": "^1.0.4"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

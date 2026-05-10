@@ -2344,10 +2344,10 @@ v8-to-istanbul@^9.0.1:
     "@types/istanbul-lib-coverage" "^2.0.1"
     convert-source-map "^2.0.0"
 
-void57-chess@1.0.2:
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/void57-chess/-/void57-chess-1.0.2.tgz#d21a69daaf77a63b509859e2e770eb427e3cc9e4"
-  integrity sha512-3ZHhN/31qL+WmStfu2A3iP8Ny+FQ5VSKyKlkx5EFJ/M69/7Y66gfwTLivsXLLQrDcd9DERJx1y5D7cr357oyew==
+void57-chess@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/void57-chess/-/void57-chess-1.0.4.tgz#32c7781176ad853c612609a7c74366f1b5117e70"
+  integrity sha512-U+5QJ8HoKHcP2IJCK99L/CxQn1b+x3ecQkm6p4ehD/CAApXQZbnEV2Ml0zYgSgSRaINO0hiJGPzGBZfuigb/5A==
 
 walker@^1.0.8:
   version "1.0.8"
