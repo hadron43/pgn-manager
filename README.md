@@ -66,6 +66,15 @@ const headers = manager.headers;
 - `getMoveFen(moveOrMoveId: Move | number)`: Get FEN position after move
 - `getParentRav(moveOrMoveId: Move | number)`: Get parent variation for move
 - `getMoveColor(moveOrMoveId: Move | number)`: Gets the color of the player who made the move ("w" for white or "b" for black)
+- `getMoveNotation(moveOrMoveId: Move | number)`: Get a move with its number, e.g. "12... Nf6"
+- `getMoveSquares(moveOrMoveId: Move | number)`: Get the squares a move was played from and to
+- `isMainline(moveOrMoveId: Move | number)`: Check if a move is in the main line
+- `getNextMoves(moveOrMoveId?: Move | number)`: Get every move that can follow a move, variations included
+- `getComment(moveOrMoveId)` / `setComment(moveOrMoveId, text)`: Get or set a move's comment text, keeping `[%...]` commands
+- `getAnnotations(moveOrMoveId)` / `setAnnotations(moveOrMoveId, annotations)`: Get or set a move's arrows (`[%cal]`) and square highlights (`[%csl]`)
+- `setHeaders(headers: Header[])`: Replace the headers, keeping FEN, SetUp and Variant
+- `promoteVariation(moveOrMoveId)` / `promoteToMainline(moveOrMoveId)`: Promote the variation holding a move one level, or to the main line
+- `deleteVariation(moveOrMoveId)`: Delete the variation holding a move
 
 ## Examples 🎯
 
