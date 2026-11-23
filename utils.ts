@@ -1,6 +1,25 @@
 import type { ParsedPGN, Move } from "pgn-parser";
 
 /**
+ * Converts a move comment to its PGN text. pgn-parser types comments as
+ * strings but parses them as objects: the text, and the [%key value]
+ * commands when the comment holds only those.
+ */
+export function commentToString(
+  comment:
+    | string
+    | { text?: string; commands?: { key: string; values: string[] }[] }
+): string {
+  if (typeof comment === "string") {
+    return comment;
+  }
+  const commands = (comment.commands || []).map(
+    ({ key, values }) => `[%${key} ${values.join(",")}]`
+  );
+  return [comment.text, ...commands].filter(Boolean).join(" ");
+}
+
+/**
  * Regenerates a PGN string from a ParsedPGN object
  */
 export function regeneratePGN(
@@ -60,12 +79,13 @@ function formatMoves(moves: Move[], moveColor: Map<Move, "w" | "b">): string {
       }
     }
 
-    // Add the move
-    parts.push(move.move);
+    // Add the move and its NAGs ($1, $14, ...), which pgn-parser leaves untyped
+    const nags = (move as Move & { nags?: string[] }).nags || [];
+    parts.push(move.move, ...nags);
 
     // Add comments after the move
     move.comments.forEach((comment) => {
-      parts.push(`{${comment}}`);
+      parts.push(`{${commentToString(comment)}}`);
     });
 
     // Add variations (RAVs)

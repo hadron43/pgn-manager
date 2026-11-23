@@ -2,7 +2,7 @@ import { Chess, Chess960 } from "void57-chess";
 import * as pgnParser from "pgn-parser";
 import type { ParsedPGN, Move, Rav, Header, Result } from "pgn-parser";
 
-import { regeneratePGN } from "./utils";
+import { regeneratePGN, commentToString } from "./utils";
 
 export const FEN_START_POSITION =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -14,6 +14,26 @@ export type ShortMove = {
   to: string;
   promotion?: string;
 };
+
+/** Arrow and highlight colors, as in [%cal Ge2e4] and [%csl Rd5] */
+export type AnnotationColor = "G" | "R" | "Y" | "B";
+
+/** Arrows ([%cal]) and square highlights ([%csl]) of a move */
+export type Annotations = {
+  arrows: { from: string; to: string; color: AnnotationColor }[];
+  highlights: { square: string; color: AnnotationColor }[];
+};
+
+/** Headers the moves depend on, which setHeaders keeps as they are */
+const PROTECTED_HEADERS = ["fen", "setup", "variant"];
+
+const RESULTS: Result[] = ["1-0", "0-1", "1/2-1/2", "*"];
+
+/** Any [%key value] command in a comment, e.g. [%clk 0:05:00] */
+const COMMAND_REGEX = /\[%[^\]]*\]/g;
+
+/** The arrow and highlight commands */
+const ANNOTATION_REGEX = /\[%(cal|csl)\s+([^\]]*)\]/g;
 
 /** Shared instance type for both Chess and Chess960 */
 type ChessInstance = Chess | Chess960;
@@ -283,7 +303,8 @@ class PGNManager {
       if (indexInParent == 0) {
         let superParent = this.ravParent.get(parentRav);
         if (superParent) {
-          tempPrevMove = superParent;
+          // a variation replaces its parent move, so it follows the one before
+          return this.previousMove(superParent);
         }
       } else {
         tempPrevMove = parentRav.moves[indexInParent - 1];
@@ -533,6 +554,283 @@ class PGNManager {
     // update the PGN and rebuild internal state
     this.rawPGN = regeneratePGN(this.game, this.moveColor);
     this.dfOnGame(this.game);
+  };
+
+  /**
+   * Gets a move with its number, as a move list shows it
+   * @param moveOrId - The move object or move number
+   * @returns e.g. "12. Nf3" or "12... Nf6"
+   * @throws Error if the move parameter is invalid
+   */
+  public getMoveNotation = (moveOrId: Move | number): string => {
+    const move = this.toMove(moveOrId);
+    const fullMoveNumber = Number(this.getMoveFen(move).split(" ")[5]);
+    return this.getMoveColor(move) === "w"
+      ? `${fullMoveNumber}. ${move.move}`
+      : `${fullMoveNumber - 1}... ${move.move}`;
+  };
+
+  /**
+   * Gets the squares a move was played from and to
+   * @param moveOrId - The move object or move number
+   * @returns The from and to squares
+   * @throws Error if the move parameter is invalid
+   */
+  public getMoveSquares = (
+    moveOrId: Move | number
+  ): { from: string; to: string } => {
+    const move = this.toMove(moveOrId);
+    const previous = this.previousMove(move);
+    const fen = previous
+      ? this.getMoveFen(previous)
+      : this.headers.find((h) => h.name.toUpperCase() === "FEN")?.value ||
+        FEN_START_POSITION;
+    const { from, to } = createChessInstance(fen, this.game.headers).move(
+      move.move
+    );
+    return { from, to };
+  };
+
+  /**
+   * Checks if a move is in the main line
+   * @param moveOrId - The move object or move number
+   * @returns True if the move is in the main line, false if in a variation
+   * @throws Error if the move parameter is invalid
+   */
+  public isMainline = (moveOrId: Move | number): boolean => {
+    return this.getParentRav(moveOrId) === this.game;
+  };
+
+  /**
+   * Gets every move that can follow a move: the next move of its line, then
+   * the first move of each variation of that next move
+   * @param moveOrId - The move object or move number, or undefined for the start
+   * @returns The next moves, or an empty array at the end of a line
+   */
+  public getNextMoves = (moveOrId?: Move | number): Move[] => {
+    const move = moveOrId === undefined ? undefined : this.toMove(moveOrId);
+    const line = move ? this.getParentRav(move) : this.game;
+    const next = line.moves[move ? line.moves.indexOf(move) + 1 : 0];
+    if (!next) {
+      return [];
+    }
+    return [next, ...(next.ravs || []).map((rav) => rav.moves[0])];
+  };
+
+  /**
+   * Gets the comment text of a move, without [%...] commands
+   * @param moveOrId - The move object or move number
+   * @returns The comment text, or an empty string
+   * @throws Error if the move parameter is invalid
+   */
+  public getComment = (moveOrId: Move | number): string => {
+    return this.getFullComment(this.toMove(moveOrId))
+      .replace(COMMAND_REGEX, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  /**
+   * Sets the comment text of a move, keeping its [%...] commands
+   * @param moveOrId - The move object or move number
+   * @param text - The new comment text, or an empty string to remove it
+   * @throws Error if the move parameter is invalid
+   */
+  public setComment = (moveOrId: Move | number, text: string): void => {
+    const move = this.toMove(moveOrId);
+    const commands = this.getFullComment(move).match(COMMAND_REGEX) || [];
+    this.writeComment(move, [text.replace(/[{}]/g, ""), ...commands]);
+  };
+
+  /**
+   * Gets the arrows and square highlights of a move
+   * @param moveOrId - The move object or move number
+   * @returns The arrows and highlights
+   * @throws Error if the move parameter is invalid
+   */
+  public getAnnotations = (moveOrId: Move | number): Annotations => {
+    const annotations: Annotations = { arrows: [], highlights: [] };
+    const comment = this.getFullComment(this.toMove(moveOrId));
+
+    for (const [, command, values] of comment.matchAll(ANNOTATION_REGEX)) {
+      for (const value of values.split(",").map((v) => v.trim())) {
+        const color = value[0] as AnnotationColor;
+        const squares = value.slice(1);
+        if (!"GRYB".includes(color)) continue;
+
+        if (command === "cal" && squares.length === 4) {
+          annotations.arrows.push({
+            from: squares.slice(0, 2),
+            to: squares.slice(2),
+            color,
+          });
+        } else if (command === "csl" && squares.length === 2) {
+          annotations.highlights.push({ square: squares, color });
+        }
+      }
+    }
+    return annotations;
+  };
+
+  /**
+   * Replaces the arrows and square highlights of a move, keeping its comment
+   * text and other commands
+   * @param moveOrId - The move object or move number
+   * @param annotations - The arrows and highlights to set
+   * @throws Error if the move parameter is invalid
+   */
+  public setAnnotations = (
+    moveOrId: Move | number,
+    { arrows, highlights }: Annotations
+  ): void => {
+    const move = this.toMove(moveOrId);
+    this.writeComment(move, [
+      this.getFullComment(move).replace(ANNOTATION_REGEX, ""),
+      highlights.length
+        ? `[%csl ${highlights.map((h) => h.color + h.square).join(",")}]`
+        : "",
+      arrows.length
+        ? `[%cal ${arrows.map((a) => a.color + a.from + a.to).join(",")}]`
+        : "",
+    ]);
+  };
+
+  /**
+   * Replaces the game headers. FEN, SetUp and Variant are kept as they are,
+   * and a valid Result header also sets the game result.
+   * @param headers - The new headers; ones with an empty name or value are dropped
+   */
+  public setHeaders = (headers: Header[]): void => {
+    const isProtected = (h: Header) =>
+      PROTECTED_HEADERS.includes(h.name.toLowerCase());
+
+    this.game.headers = [
+      ...headers
+        .map((h) => ({
+          name: h.name.replace(/[\s"\]]/g, ""),
+          value: h.value.replace(/"/g, "'").trim(),
+        }))
+        .filter((h) => h.name && h.value && !isProtected(h)),
+      ...this.headers.filter(isProtected),
+    ];
+
+    const result = headers.find((h) => h.name === "Result")?.value as Result;
+    if (RESULTS.includes(result)) {
+      this.game.result = result;
+    }
+    this.rebuild();
+  };
+
+  /**
+   * Swaps the variation holding a move with the line it branches off
+   * @param moveOrId - Any move of the variation
+   * @returns False if the move is in the main line
+   * @throws Error if the move parameter is invalid
+   */
+  public promoteVariation = (moveOrId: Move | number): boolean => {
+    const variation = this.getParentRav(moveOrId);
+    if (variation === this.game) {
+      return false;
+    }
+    this.swapWithParentLine(variation);
+    this.rebuild();
+    return true;
+  };
+
+  /**
+   * Promotes the variation holding a move until it is the main line
+   * @param moveOrId - Any move of the variation
+   * @returns False if the move is already in the main line
+   * @throws Error if the move parameter is invalid
+   */
+  public promoteToMainline = (moveOrId: Move | number): boolean => {
+    let line = this.getParentRav(moveOrId);
+    if (line === this.game) {
+      return false;
+    }
+    while (line !== this.game) {
+      line = this.swapWithParentLine(line);
+    }
+    this.rebuild();
+    return true;
+  };
+
+  /**
+   * Deletes the whole variation holding a move
+   * @param moveOrId - Any move of the variation
+   * @returns The move before the variation, or undefined if there is none or
+   * the move is in the main line
+   * @throws Error if the move parameter is invalid
+   */
+  public deleteVariation = (moveOrId: Move | number): Move | undefined => {
+    const variation = this.getParentRav(moveOrId);
+    const anchor = this.ravParent.get(variation);
+    if (!anchor) {
+      return undefined;
+    }
+    const previous = this.previousMove(anchor);
+    const ravs = anchor.ravs.filter((rav) => rav !== variation);
+    anchor.ravs = ravs.length ? ravs : undefined;
+    this.rebuild();
+    return previous;
+  };
+
+  /**
+   * Gets the move object for a move object or move number
+   * @throws Error if the move parameter is invalid
+   */
+  private toMove = (moveOrId: Move | number): Move => {
+    const move =
+      typeof moveOrId === "number" ? this.getMove(moveOrId) : moveOrId;
+    if (!move || !this.moveParent.has(move)) {
+      throw Error("Invalid 'move' parameter");
+    }
+    return move;
+  };
+
+  /** All comments of a move as one string, [%...] commands included */
+  private getFullComment = (move: Move): string => {
+    return move.comments.map(commentToString).join(" ");
+  };
+
+  /** Replaces the comments of a move with one built from the given parts */
+  private writeComment = (move: Move, parts: string[]): void => {
+    const comment = parts.join(" ").replace(/\s+/g, " ").trim();
+    move.comments = comment ? [comment] : [];
+    this.rebuild();
+  };
+
+  /**
+   * Puts a variation in place of the moves it is an alternative to, which
+   * become its first variation
+   * @returns The line the variation moved into
+   */
+  private swapWithParentLine = (variation: Rav): Rav => {
+    const anchor = this.ravParent.get(variation);
+    const line = this.getParentRav(anchor);
+    const replacedMoves = line.moves.splice(line.moves.indexOf(anchor));
+    const otherVariations = anchor.ravs.filter((rav) => rav !== variation);
+    anchor.ravs = undefined;
+
+    const [firstMove] = variation.moves;
+    firstMove.ravs = [
+      { moves: replacedMoves, result: null },
+      ...otherVariations,
+      ...(firstMove.ravs || []),
+    ];
+    line.moves.push(...variation.moves);
+    return line;
+  };
+
+  /** Rebuilds the internal state after an edit and regenerates the PGN */
+  private rebuild = (): void => {
+    this.moveParent = new Map();
+    this.ravParent = new Map();
+    this.moveFen = new Map();
+    this.fenMove = new Map();
+    this.moveColor = new Map();
+    this.dfOnGame(this.game);
+    this.rawPGN = regeneratePGN(this.game, this.moveColor);
   };
 }
 

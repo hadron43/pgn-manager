@@ -626,3 +626,74 @@ describe("PGNManager", () => {
     });
   });
 });
+
+describe("PGNManager editing", () => {
+  const pgn = `1. e4 e5 2. Nf3 (2. f4 {King's Gambit [%cal Gf2f4]} exf4) 2... Nc6 $1 *`;
+
+  it("should keep comments and NAGs when the PGN is regenerated", () => {
+    const manager = new PGNManager(pgn);
+    manager.pushMove(5, { from: "f1", to: "b5" });
+    expect(manager.pgn).toContain("{King's Gambit [%cal Gf2f4]}");
+    expect(manager.pgn).toContain("Nc6 $1");
+  });
+
+  it("should go from a variation's first move to the move before its parent", () => {
+    const manager = new PGNManager(pgn);
+    expect(manager.previousMove(4)?.move).toBe("e5");
+  });
+
+  it("should describe moves and what can follow them", () => {
+    const manager = new PGNManager(pgn);
+    expect(manager.getMoveNotation(4)).toBe("2. f4");
+    expect(manager.getMoveNotation(6)).toBe("2... Nc6");
+    expect(manager.getMoveSquares(5)).toEqual({ from: "e5", to: "f4" });
+    expect(manager.isMainline(4)).toBe(false);
+    expect(manager.getNextMoves(2).map((m) => m.move)).toEqual(["Nf3", "f4"]);
+  });
+
+  it("should edit comments and annotations separately", () => {
+    const manager = new PGNManager(pgn);
+    expect(manager.getComment(4)).toBe("King's Gambit");
+    expect(manager.getAnnotations(4).arrows).toEqual([
+      { from: "f2", to: "f4", color: "G" },
+    ]);
+
+    manager.setComment(4, "Sharp");
+    manager.setAnnotations(4, {
+      arrows: [],
+      highlights: [{ square: "e5", color: "R" }],
+    });
+    expect(manager.pgn).toContain("2. f4 {Sharp [%csl Re5]}");
+  });
+
+  it("should replace headers but keep the ones the moves depend on", () => {
+    const fen = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1";
+    const manager = new PGNManager(`[FEN "${fen}"]\n\n1. e4 *`);
+    manager.setHeaders([
+      { name: "White", value: "Carlsen" },
+      { name: "FEN", value: FEN_START_POSITION },
+      { name: "Result", value: "1-0" },
+    ]);
+    expect(manager.headers).toEqual([
+      { name: "White", value: "Carlsen" },
+      { name: "Result", value: "1-0" },
+      { name: "FEN", value: fen },
+    ]);
+    expect(manager.parsedPGN.result).toBe("1-0");
+  });
+
+  it("should promote and delete variations", () => {
+    const manager = new PGNManager(pgn);
+    expect(manager.promoteToMainline(5)).toBe(true);
+    expect(manager.parsedPGN.moves.map((m) => m.move)).toEqual([
+      "e4",
+      "e5",
+      "f4",
+      "exf4",
+    ]);
+    expect(new PGNManager(manager.pgn).pgn).toBe(manager.pgn);
+
+    expect(manager.deleteVariation(4)?.move).toBe("e5");
+    expect(manager.pgn).not.toContain("Nf3");
+  });
+});
