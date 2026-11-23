@@ -435,74 +435,34 @@ class PGNManager {
       return this.fenMove.get(chess.fen());
     }
 
-    // 3) Build move object with provisional move_number
-    const provisionalNumber = (() => {
-      if (!current) {
-        return 1; // brand‐new mainline
-      }
-      const currNum =
-        current.move_number || this.previousMove(current)?.move_number;
-      const currColor = this.getMoveColor(current);
-      return currColor === "w" ? currNum : currNum + 1;
-    })();
-
+    // 3) Build move object; rebuild() numbers it
     const moveObj: Move = {
       move: san,
       ravs: undefined,
-      move_number: provisionalNumber,
       comments: [],
     };
 
-    // 4) Insert into structure & flag first‐of‐variation
-    let isFirstOfVariation = !current;
-
+    // 4) Insert into structure
     if (!current) {
       // brand-new mainline => variation of first move if exists
       const first = parentRav.moves[0];
       if (first) {
-        isFirstOfVariation = true;
-        const newRav: Rav = { moves: [moveObj], result };
         first.ravs = first.ravs || [];
-        first.ravs.push(newRav);
-        this.moveParent.set(moveObj, newRav);
-        this.ravParent.set(newRav, first);
+        first.ravs.push({ moves: [moveObj], result });
       } else {
         parentRav.moves.push(moveObj);
-        this.moveParent.set(moveObj, parentRav);
       }
+    } else if (parentRav.moves[parentRav.moves.length - 1] !== current) {
+      // new variation off the next move
+      const anchor = this.nextMove(current) || current;
+      anchor.ravs = anchor.ravs || [];
+      anchor.ravs.push({ moves: [moveObj], result });
     } else {
-      // existing‐move branch
-      const lastInRav = parentRav.moves[parentRav.moves.length - 1];
-      const isContinuation = lastInRav === current;
-
-      if (!isContinuation) {
-        // new variation off the next move
-        isFirstOfVariation = true;
-        const anchor = this.nextMove(current) || current;
-        anchor.ravs = anchor.ravs || [];
-        const newRav: Rav = { moves: [moveObj], result };
-        anchor.ravs.push(newRav);
-        this.moveParent.set(moveObj, newRav);
-        this.ravParent.set(newRav, anchor);
-      } else {
-        // continuation
-        parentRav.moves.push(moveObj);
-        this.moveParent.set(moveObj, parentRav);
-      }
+      // continuation
+      parentRav.moves.push(moveObj);
     }
 
-    // 5) Conditionally remove move_number
-    // Keep it only if first‐of‐variation OR new move is White to play
-    if (!(isFirstOfVariation || nextToMove === "b")) {
-      delete moveObj.move_number;
-    }
-
-    // 6) Final bookkeeping
-    this.moveFen.set(moveObj, chess.fen());
-    this.fenMove.set(chess.fen(), moveObj);
-    this.moveColor.set(moveObj, nextToMove === "w" ? "b" : "w");
-    this.rawPGN = regeneratePGN(this.game, this.moveColor);
-    this.dfOnGame(this.game);
+    this.rebuild();
 
     return moveObj;
   };
@@ -520,40 +480,9 @@ class PGNManager {
 
     // delete the move and subsequent moves from the game
     const parentRav = this.getParentRav(move);
-    const index = parentRav.moves.indexOf(move);
-    const deletedMoves = parentRav.moves.splice(index);
+    parentRav.moves.splice(parentRav.moves.indexOf(move));
 
-    // collect all moves and variations that need cleanup
-    const movsToClean = [];
-    const ravsToClean = [];
-
-    for (const deletedMove of deletedMoves) {
-      movsToClean.push(deletedMove);
-      if (deletedMove.ravs) {
-        for (const rav of deletedMove.ravs) {
-          ravsToClean.push(rav);
-        }
-      }
-    }
-
-    // Sort moves by their moveId in decreasing order
-    movsToClean.sort((a, b) => this.getMoveNumber(b) - this.getMoveNumber(a));
-
-    // clean up all maps at once
-    movsToClean.forEach((move) => {
-      this.moveParent.delete(move);
-      this.fenMove.delete(this.getMoveFen(move));
-      this.moveFen.delete(move);
-      this.moveColor.delete(move);
-    });
-
-    ravsToClean.forEach((rav) => {
-      this.ravParent.delete(rav);
-    });
-
-    // update the PGN and rebuild internal state
-    this.rawPGN = regeneratePGN(this.game, this.moveColor);
-    this.dfOnGame(this.game);
+    this.rebuild();
   };
 
   /**

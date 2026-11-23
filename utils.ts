@@ -31,7 +31,7 @@ export function regeneratePGN(
   // Add comments above header
   if (parsedPGN.comments_above_header) {
     parsedPGN.comments_above_header.forEach((comment) => {
-      lines.push(`{${comment.text}}`);
+      lines.push(`{${commentToString(comment)}}`);
     });
     lines.push("");
   }
@@ -47,7 +47,7 @@ export function regeneratePGN(
   // Add comments between headers and moves
   if (parsedPGN.comments) {
     parsedPGN.comments.forEach((comment) => {
-      lines.push(`{${comment.text}}`);
+      lines.push(`{${commentToString(comment)}}`);
     });
     lines.push("");
   }
