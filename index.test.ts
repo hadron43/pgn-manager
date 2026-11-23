@@ -171,6 +171,28 @@ describe("PGNManager", () => {
       expect(manager.hasNextMove(firstMove)).toBe(true);
       expect(manager.hasNextMove(lastMove)).toBe(false);
     });
+
+    it("should stay in a variation when it ends", () => {
+      const manager = new PGNManager(
+        "1. e4 e5 (1... c5 2. Nf3 (2. c3 d5) 2... d6) 2. Nf3 Nc6 3. Bb5 *",
+      );
+      const moves: Move[] = [];
+      for (let i = 1; manager.getMove(i); i++) moves.push(manager.getMove(i));
+      const find = (san: string) => moves.find((m) => m.move === san)!;
+      const c5 = find("c5");
+      const sideNf3 = find("Nf3");
+      const d6 = find("d6");
+      const d5 = find("d5");
+
+      expect(manager.nextMove(c5)).toBe(sideNf3);
+      expect(manager.nextMove(sideNf3)).toBe(d6);
+      expect(manager.nextMove(d6)).toBe(d6);
+      expect(manager.hasNextMove(d6)).toBe(false);
+      expect(manager.nextMove(d5)).toBe(d5);
+      expect(manager.hasNextMove(d5)).toBe(false);
+      expect(manager.nextMove(find("e5")).move).toBe("Nf3");
+      expect(manager.nextMove(find("e5"))).not.toBe(sideNf3);
+    });
   });
 
   describe("Previous Move Navigation", () => {

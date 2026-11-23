@@ -218,9 +218,9 @@ class PGNManager {
   };
 
   /**
-   * Gets the next move in the sequence
+   * Gets the next move in the same line; a variation never continues into its parent line
    * @param moveOrId - The current move object or move number
-   * @returns The next move in the sequence
+   * @returns The next move in the line, or the move itself at the end of its line
    * @throws Error if there are no moves in the game
    */
   public nextMove = (moveOrId: Move | number | undefined): Move => {
@@ -238,29 +238,8 @@ class PGNManager {
       return this.sortedMoves[0];
     }
 
-    if (
-      move == this.game.moves[this.game.moves.length - 1] ||
-      move === this.sortedMoves[this.sortedMoves.length - 1]
-    ) {
-      return move;
-    }
-
-    let parentRav = this.moveParent.get(move);
-    let tempNextMove = this.getMove(this.getMoveNumber(move) + 1);
-
-    if (parentRav) {
-      let indexInParent = parentRav.moves.indexOf(move);
-      if (indexInParent == parentRav.moves.length - 1) {
-        let superParent = this.ravParent.get(parentRav);
-        if (superParent) {
-          tempNextMove = this.nextMove(superParent);
-        }
-      } else {
-        tempNextMove = parentRav.moves[indexInParent + 1];
-      }
-    }
-
-    return tempNextMove;
+    const line = this.moveParent.get(move) ?? this.game;
+    return line.moves[line.moves.indexOf(move) + 1] ?? move;
   };
 
   /**
