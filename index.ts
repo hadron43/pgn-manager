@@ -830,7 +830,32 @@ class PGNManager {
     this.fenMove = new Map();
     this.moveColor = new Map();
     this.dfOnGame(this.game);
+    this.renumberMoves(this.game);
     this.rawPGN = regeneratePGN(this.game, this.moveColor);
+  };
+
+  /**
+   * Sets move numbers where PGN needs them: on white moves, and on black moves
+   * that start a line or follow a comment or variation. Edits move moves
+   * between lines, so the numbers parsed from the original PGN go stale.
+   */
+  private renumberMoves = (line: Rav): void => {
+    line.moves.forEach((move, index) => {
+      const previous = line.moves[index - 1];
+      const fullMoveNumber = Number(this.getMoveFen(move).split(" ")[5]);
+      if (this.getMoveColor(move) === "w") {
+        move.move_number = fullMoveNumber;
+      } else if (
+        !previous ||
+        previous.comments.length > 0 ||
+        (previous.ravs?.length ?? 0) > 0
+      ) {
+        move.move_number = fullMoveNumber - 1;
+      } else {
+        delete move.move_number;
+      }
+      move.ravs?.forEach(this.renumberMoves);
+    });
   };
 }
 

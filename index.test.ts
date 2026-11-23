@@ -696,4 +696,15 @@ describe("PGNManager editing", () => {
     expect(manager.deleteVariation(4)?.move).toBe("e5");
     expect(manager.pgn).not.toContain("Nf3");
   });
+
+  it("should number moves that change lines when a variation is promoted", () => {
+    const manager = new PGNManager(
+      `1. e4 e5 2. Nf3 (2. f4 exf4 (2... d5) 3. Nf3) 2... Nc6 *`
+    );
+    expect(manager.promoteToMainline(6)).toBe(true);
+    expect(manager.pgn).toBe(
+      "1. e4 e5 2. f4 (2. Nf3 Nc6) 2... d5 (2... exf4 3. Nf3)\n*"
+    );
+    expect(new PGNManager(manager.pgn).pgn).toBe(manager.pgn);
+  });
 });
