@@ -707,4 +707,37 @@ describe("PGNManager editing", () => {
     );
     expect(new PGNManager(manager.pgn).pgn).toBe(manager.pgn);
   });
+
+  it("should keep game comments that only hold commands", () => {
+    const manager = new PGNManager(
+      `{[%csl Ra1]}\n[Event "X"]\n\n{[%csl Gd4]} 1. e4 *`
+    );
+    manager.setComment(1, "x");
+    expect(manager.pgn).toContain("{[%csl Ra1]}");
+    expect(manager.pgn).toContain("{[%csl Gd4]}");
+    expect(manager.pgn).not.toContain("undefined");
+  });
+
+  it("should number pushed moves from the position in a FEN game", () => {
+    const manager = new PGNManager(
+      `[SetUp "1"]\n[FEN "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4"]\n\n4. Qxf7# *`
+    );
+    const pushed = manager.pushMove(0, { from: "g1", to: "h3" });
+    expect(pushed.move_number).toBe(4);
+    expect(manager.pgn).toContain("(4. Nh3");
+    expect(manager.getMoveNumber(pushed)).toBe(2);
+  });
+
+  it("should number a black move that follows a pushed variation", () => {
+    const manager = new PGNManager("1. e4 e5 2. Nf3 Nc6 *");
+    manager.pushMove(2, { from: "g1", to: "h3" });
+    expect(manager.pgn).toContain("(2. Nh3 *) 2... Nc6");
+  });
+
+  it("should keep the line numbered after deleting moves from a variation", () => {
+    const manager = new PGNManager("1. e4 e5 (1... c5 2. Nf3) 2. Nf3 Nc6 *");
+    manager.deleteMove(4);
+    expect(manager.pgn).toContain("(1... c5) 2. Nf3 Nc6");
+    expect(manager.getNextMoves(2).map((m) => m.move)).toEqual(["Nf3"]);
+  });
 });
